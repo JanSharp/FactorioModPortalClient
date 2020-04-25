@@ -24,7 +24,7 @@ namespace FactorioModPortalClient
             this.userToken = userToken;
         }
 
-        string BuildUrl(string main, Dictionary<string, string> parameters = null)
+        string BuildUrl(string main, Dictionary<string, string>? parameters = null)
         {
             UriBuilder uriBuilder = new UriBuilder(main) { Port = -1 };
             var query = HttpUtility.ParseQueryString(uriBuilder.Query);
@@ -60,13 +60,13 @@ namespace FactorioModPortalClient
             return await GetTInternalAsync<ResultEntryFull>(BuildUrl($"{BaseUrl}/api/mods/{modName}/full"));
         }
 
-        public async Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string> namelist = null)
+        public async Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string>? namelist = null)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             if (page.HasValue)
-                parameters.Add("page", page.ToString());
+                parameters.Add("page", page.Value.ToString());
             if (pageSize.HasValue)
-                parameters.Add("page_size", pageSize.ToString());
+                parameters.Add("page_size", pageSize.Value.ToString());
             if (namelist != null)
                 throw new NotImplementedException(); // TODO
             return await GetTInternalAsync<ModListResponse>(BuildUrl($"{BaseUrl}/api/mods", parameters));
@@ -96,13 +96,13 @@ namespace FactorioModPortalClient
             }
         }
 
-        public async IAsyncEnumerable<ResultEntry> EnumerateAsync(int pageSize = 64, IEnumerable<string> namelist = null)
+        public async IAsyncEnumerable<ResultEntry> EnumerateAsync(int pageSize = 64, IEnumerable<string>? namelist = null)
         {
             ModListResponse currentPage = await GetAsync(pageSize: pageSize, namelist: namelist);
 
             while (true)
             {
-                Task<ModListResponse> nextPage;
+                Task<ModListResponse>? nextPage;
                 if (currentPage.Pagination.Links.Next == null)
                     nextPage = null;
                 else
@@ -117,9 +117,64 @@ namespace FactorioModPortalClient
             }
         }
 
-        public async IAsyncEnumerable<ResultEntryFull> EnumerateFullAsync(int pageSize = 64, IEnumerable<string> namelist = null)
+        async IAsyncEnumerable<T> EnumerateShortOrFullInternalAsync<T>(Func<string, Task<T>> getterAsync, IEnumerable<string>? namelist = null)
         {
-            yield return await GetResultEntryFullAsync("");
+            ModListResponse currentPage = await GetAsync(pageSize: 32, namelist: namelist);
+
+            List<Task<T>> runningGetFullTasks = new List<Task<T>>(8);
+
+            int i = 0; // index in currentPage.Results
+            int resultsInPage = currentPage.Results.Count;
+            for (; i < Math.Min(resultsInPage, 8); i++) // start first 8 or less
+                runningGetFullTasks.Add(getterAsync(currentPage.Results[i].Name));
+
+            // run and start new ones while there are still 8 running
+            while (runningGetFullTasks.Count == 8)
+            {
+                Task<ModListResponse>? nextPage;
+                if (currentPage.Pagination.Links.Next == null)
+                    nextPage = null;
+                else
+                    nextPage = GetTInternalAsync<ModListResponse>(currentPage.Pagination.Links.Next);
+
+                while (true)
+                {
+                    Task<T> done = await Task.WhenAny(runningGetFullTasks);
+                    runningGetFullTasks.Remove(done);
+                    yield return await done;
+                    if (i < resultsInPage)
+                        runningGetFullTasks.Add(getterAsync(currentPage.Results[++i].Name));
+                    else
+                        break; // leaving with 7 in runningGetFullTasks
+                }
+
+                if (nextPage == null)
+                    break;
+                currentPage = await nextPage;
+                resultsInPage = currentPage.Results.Count;
+                i = 0; // reset i and add 8th to runningGetFullTasks
+                runningGetFullTasks.Add(getterAsync(currentPage.Results[++i].Name));
+            }
+
+            // finishing last 7 or less
+            while (runningGetFullTasks.Count != 0)
+            {
+                Task<T> done = await Task.WhenAny(runningGetFullTasks);
+                runningGetFullTasks.Remove(done);
+                yield return await done;
+            }
+        }
+
+        public async IAsyncEnumerable<ResultEntryShort> EnumerateShortAsync(IEnumerable<string>? namelist = null)
+        {
+            await foreach (ResultEntryShort entry in EnumerateShortOrFullInternalAsync(GetResultEntryShortAsync, namelist))
+                yield return entry;
+        }
+
+        public async IAsyncEnumerable<ResultEntryFull> EnumerateFullAsync(IEnumerable<string>? namelist = null)
+        {
+            await foreach (ResultEntryFull entry in EnumerateShortOrFullInternalAsync(GetResultEntryFullAsync, namelist))
+                yield return entry;
         }
     }
 }
