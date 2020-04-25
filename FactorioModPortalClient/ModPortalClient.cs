@@ -116,5 +116,10 @@ namespace FactorioModPortalClient
                 currentPage = await nextPage;
             }
         }
+
+        public async IAsyncEnumerable<ResultEntryFull> EnumerateFullAsync(int pageSize = 64, IEnumerable<string> namelist = null)
+        {
+            yield return await GetResultEntryFullAsync("");
+        }
     }
 }
