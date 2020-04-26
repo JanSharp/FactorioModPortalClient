@@ -72,10 +72,11 @@ namespace FactorioModPortalClient
         [JsonPropertyName("homepage")]
         public string Homepage { get; set; }
 
-        /// <summary>
-        /// A list of tag objects that categorize the mod.
-        /// </summary>
-        [JsonPropertyName("tag")]
-        public List<Tag> Tags { get; set; }
+        // TODO: figure out the actual tags format, because this is not it
+        ///// <summary>
+        ///// A list of tag objects that categorize the mod.
+        ///// </summary>
+        //[JsonPropertyName("tag")]
+        //public List<Tag> Tags { get; set; }
     }
 }

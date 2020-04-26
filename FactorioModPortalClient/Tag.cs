@@ -14,21 +14,21 @@ namespace FactorioModPortalClient
         /// An all lower-case string used to identify this tag internally.
         /// </summary>
         [JsonPropertyName("name")]
-        public int Name { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// The tag's human-readable tag name.
         /// </summary>
         [JsonPropertyName("title")]
-        public int Title { get; set; }
+        public string Title { get; set; }
 
         /// <summary>
         /// A short description for the tag.
         /// </summary>
         [JsonPropertyName("description")]
-        public int Description { get; set; }
+        public string Description { get; set; }
 
         [JsonPropertyName("type")]
-        public int Type { get; set; }
+        public string Type { get; set; }
     }
 }

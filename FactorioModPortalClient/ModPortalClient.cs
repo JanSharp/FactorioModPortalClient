@@ -79,6 +79,7 @@ namespace FactorioModPortalClient
         /// <returns></returns>
         public async Task<ZipArchive> DownloadModAsync(Release release)
         {
+            // TODO: validate downloaded data with the given sha1 thing
             HttpResponseMessage response = await GetResponseAsync(BuildUrl($"{BaseUrl}/{release.DownloadUrl}", new Dictionary<string, string>()
             {
                 { "username", userName },
@@ -119,17 +120,17 @@ namespace FactorioModPortalClient
 
         async IAsyncEnumerable<T> EnumerateShortOrFullInternalAsync<T>(Func<string, Task<T>> getterAsync, IEnumerable<string>? namelist = null)
         {
-            ModListResponse currentPage = await GetAsync(pageSize: 32, namelist: namelist);
+            ModListResponse currentPage = await GetAsync(pageSize: 64, namelist: namelist);
 
-            List<Task<T>> runningGetFullTasks = new List<Task<T>>(8);
+            List<Task<T>> runningGetFullTasks = new List<Task<T>>(16);
 
             int i = 0; // index in currentPage.Results
             int resultsInPage = currentPage.Results.Count;
-            for (; i < Math.Min(resultsInPage, 8); i++) // start first 8 or less
+            for (; i < Math.Min(resultsInPage, 16); i++) // start first 16 or less
                 runningGetFullTasks.Add(getterAsync(currentPage.Results[i].Name));
 
-            // run and start new ones while there are still 8 running
-            while (runningGetFullTasks.Count == 8)
+            // run and start new ones while there are still 16 running
+            while (runningGetFullTasks.Count == 16)
             {
                 Task<ModListResponse>? nextPage;
                 if (currentPage.Pagination.Links.Next == null)
@@ -143,7 +144,7 @@ namespace FactorioModPortalClient
                     runningGetFullTasks.Remove(done);
                     yield return await done;
                     if (i < resultsInPage)
-                        runningGetFullTasks.Add(getterAsync(currentPage.Results[++i].Name));
+                        runningGetFullTasks.Add(getterAsync(currentPage.Results[i++].Name));
                     else
                         break; // leaving with 7 in runningGetFullTasks
                 }
@@ -152,8 +153,8 @@ namespace FactorioModPortalClient
                     break;
                 currentPage = await nextPage;
                 resultsInPage = currentPage.Results.Count;
-                i = 0; // reset i and add 8th to runningGetFullTasks
-                runningGetFullTasks.Add(getterAsync(currentPage.Results[++i].Name));
+                i = 0; // reset i and add 16th to runningGetFullTasks
+                runningGetFullTasks.Add(getterAsync(currentPage.Results[i++].Name));
             }
 
             // finishing last 7 or less
