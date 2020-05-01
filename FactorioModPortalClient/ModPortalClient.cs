@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
-using System.Security.Cryptography;
 
 namespace FactorioModPortalClient
 {
@@ -17,12 +17,28 @@ namespace FactorioModPortalClient
         const string BaseUrl = "https://mods.factorio.com";
         public string userName;
         public string userToken;
+        public int maxRequestsPerMinute;
+        int msBetweenRequests;
+        DateTime? lastRequestTime;
 
-        public ModPortalClient(string userName, string userToken)
+        public int MaxRequestsPerMinute
+        {
+            get => maxRequestsPerMinute;
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), "MaxRequestsPerMinute must be > 0.");
+                maxRequestsPerMinute = value;
+                msBetweenRequests = (1 * 1000 * 60) / value;
+            }
+        }
+
+        public ModPortalClient(string userName, string userToken, int maxRequestsPerMinute = 10)
         {
             httpClient = new HttpClient();
             this.userName = userName;
             this.userToken = userToken;
+            MaxRequestsPerMinute = maxRequestsPerMinute; // note this setting the value to the property not the field
         }
 
         string BuildUrl(string main, Dictionary<string, string>? parameters = null)
@@ -36,8 +52,22 @@ namespace FactorioModPortalClient
             return uriBuilder.ToString();
         }
 
+        async Task ThrottleRequest()
+        {
+            DateTime now = DateTime.Now;
+            if (lastRequestTime.HasValue)
+            {
+                TimeSpan span = now - lastRequestTime.Value;
+                int msToWait = (int)span.TotalMilliseconds - msBetweenRequests;
+                if (msToWait > 0)
+                    await Task.Delay(msToWait);
+            }
+            lastRequestTime = now;
+        }
+
         async Task<HttpResponseMessage> GetResponseAsync(string url)
         {
+            await ThrottleRequest();
             HttpResponseMessage response = await httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
                 throw new NotImplementedException(); // TODO
