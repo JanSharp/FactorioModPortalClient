@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
+using System.Security.Cryptography;
 
 namespace FactorioModPortalClient
 {
@@ -84,13 +85,20 @@ namespace FactorioModPortalClient
         /// <returns></returns>
         public async Task<ZipArchive> DownloadModAsync(Release release)
         {
-            // TODO: validate downloaded data with the given sha1 thing
             HttpResponseMessage response = await GetResponseAsync(BuildUrl($"{BaseUrl}/{release.DownloadUrl}", new Dictionary<string, string>()
             {
                 { "username", userName },
                 { "token", userToken },
             }));
             Stream contentStream = await response.Content.ReadAsStreamAsync();
+
+            // sha1 validation
+            using SHA1 sha = SHA1.Create("SHA1CryptoServiceProvider"); // TODO: test if this even works (also, i hate it... that string)
+            byte[] actualSha1Bytes = sha.ComputeHash(contentStream);
+            string actualSha1Str = ByteArrayToHex(actualSha1Bytes);
+            if (release.Sha1.ToLower() != actualSha1Str.ToLower())
+                throw new Exception($"Sha1 validation failed."); // TODO: improve error handling, maybe try downloading again or
+
             try
             {
                 return new ZipArchive(contentStream, ZipArchiveMode.Read, false, Encoding.UTF8);
@@ -100,6 +108,13 @@ namespace FactorioModPortalClient
                 contentStream.Dispose();
                 throw e;
             }
+        }
+        static string ByteArrayToHex(byte[] bytes)
+        {
+            StringBuilder sb = new StringBuilder(bytes.Length * 2);
+            foreach (byte b in bytes)
+                sb.Append($"{b:x2}");
+            return sb.ToString();
         }
 
         /// <summary>
