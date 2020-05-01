@@ -60,16 +60,21 @@ namespace FactorioModPortalClient
             return await GetTInternalAsync<ResultEntryFull>(BuildUrl($"{BaseUrl}/api/mods/{modName}/full"));
         }
 
-        public async Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string>? namelist = null)
+        public async Task<ModListResponse> GetInternalAsync(string? page = null, string? pageSize = null, IEnumerable<string>? namelist = null)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
-            if (page.HasValue)
-                parameters.Add("page", page.Value.ToString());
-            if (pageSize.HasValue)
-                parameters.Add("page_size", pageSize.Value.ToString());
+            if (page != null)
+                parameters.Add("page", page);
+            if (pageSize != null)
+                parameters.Add("page_size", pageSize);
             if (namelist != null)
                 throw new NotImplementedException(); // TODO
             return await GetTInternalAsync<ModListResponse>(BuildUrl($"{BaseUrl}/api/mods", parameters));
+        }
+
+        public async Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string>? namelist = null)
+        {
+            return await GetInternalAsync(page?.ToString(), pageSize?.ToString(), namelist);
         }
 
         /// <summary>
@@ -97,84 +102,25 @@ namespace FactorioModPortalClient
             }
         }
 
-        public async IAsyncEnumerable<ResultEntry> EnumerateAsync(int pageSize = 64, IEnumerable<string>? namelist = null)
+        /// <summary>
+        /// Gets with max page size, so basically everything
+        /// </summary>
+        /// <param name="namelist"></param>
+        /// <returns></returns>
+        public async Task<ModListResponse> GetMaxAsync(IEnumerable<string>? namelist = null)
         {
-            ModListResponse currentPage = await GetAsync(pageSize: pageSize, namelist: namelist);
-
-            while (true)
-            {
-                Task<ModListResponse>? nextPage;
-                if (currentPage.Pagination.Links.Next == null)
-                    nextPage = null;
-                else
-                    nextPage = GetTInternalAsync<ModListResponse>(currentPage.Pagination.Links.Next);
-
-                foreach (ResultEntry entry in currentPage.Results)
-                    yield return entry;
-
-                if (nextPage == null)
-                    break;
-                currentPage = await nextPage;
-            }
+            return await GetInternalAsync(pageSize: "max", namelist: namelist);
         }
 
-        async IAsyncEnumerable<T> EnumerateShortOrFullInternalAsync<T>(Func<string, Task<T>> getterAsync, IEnumerable<string>? namelist = null)
+        /// <summary>
+        /// Helper method calling <see cref="GetMaxAsync(IEnumerable{string}?)"/> and enumerating <see cref="ModListResponse.Results"/>
+        /// </summary>
+        /// <param name="namelist"></param>
+        /// <returns></returns>
+        public async IAsyncEnumerable<ResultEntry> EnumerateAsync(IEnumerable<string>? namelist = null)
         {
-            ModListResponse currentPage = await GetAsync(pageSize: 64, namelist: namelist);
-
-            List<Task<T>> runningGetFullTasks = new List<Task<T>>(16);
-
-            int i = 0; // index in currentPage.Results
-            int resultsInPage = currentPage.Results.Count;
-            for (; i < Math.Min(resultsInPage, 16); i++) // start first 16 or less
-                runningGetFullTasks.Add(getterAsync(currentPage.Results[i].Name));
-
-            // run and start new ones while there are still 16 running
-            while (runningGetFullTasks.Count == 16)
-            {
-                Task<ModListResponse>? nextPage;
-                if (currentPage.Pagination.Links.Next == null)
-                    nextPage = null;
-                else
-                    nextPage = GetTInternalAsync<ModListResponse>(currentPage.Pagination.Links.Next);
-
-                while (true)
-                {
-                    Task<T> done = await Task.WhenAny(runningGetFullTasks);
-                    runningGetFullTasks.Remove(done);
-                    yield return await done;
-                    if (i < resultsInPage)
-                        runningGetFullTasks.Add(getterAsync(currentPage.Results[i++].Name));
-                    else
-                        break; // leaving with 7 in runningGetFullTasks
-                }
-
-                if (nextPage == null)
-                    break;
-                currentPage = await nextPage;
-                resultsInPage = currentPage.Results.Count;
-                i = 0; // reset i and add 16th to runningGetFullTasks
-                runningGetFullTasks.Add(getterAsync(currentPage.Results[i++].Name));
-            }
-
-            // finishing last 7 or less
-            while (runningGetFullTasks.Count != 0)
-            {
-                Task<T> done = await Task.WhenAny(runningGetFullTasks);
-                runningGetFullTasks.Remove(done);
-                yield return await done;
-            }
-        }
-
-        public async IAsyncEnumerable<ResultEntryShort> EnumerateShortAsync(IEnumerable<string>? namelist = null)
-        {
-            await foreach (ResultEntryShort entry in EnumerateShortOrFullInternalAsync(GetResultEntryShortAsync, namelist))
-                yield return entry;
-        }
-
-        public async IAsyncEnumerable<ResultEntryFull> EnumerateFullAsync(IEnumerable<string>? namelist = null)
-        {
-            await foreach (ResultEntryFull entry in EnumerateShortOrFullInternalAsync(GetResultEntryFullAsync, namelist))
+            ModListResponse page = await GetMaxAsync(namelist);
+            foreach (ResultEntry entry in page.Results)
                 yield return entry;
         }
     }
