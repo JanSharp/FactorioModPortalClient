@@ -60,7 +60,7 @@ namespace FactorioModPortalClient
             return await GetTInternalAsync<ResultEntryFull>(BuildUrl($"{BaseUrl}/api/mods/{modName}/full"));
         }
 
-        public async Task<ModListResponse> GetInternalAsync(string? page = null, string? pageSize = null, IEnumerable<string>? namelist = null)
+        async Task<ModListResponse> GetInternalAsync(string? page = null, string? pageSize = null, IEnumerable<string>? namelist = null)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             if (page != null)
