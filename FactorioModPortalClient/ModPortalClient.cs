@@ -58,7 +58,7 @@ namespace FactorioModPortalClient
             if (lastRequestTime.HasValue)
             {
                 TimeSpan span = now - lastRequestTime.Value;
-                int msToWait = (int)span.TotalMilliseconds - msBetweenRequests;
+                int msToWait = msBetweenRequests - (int)span.TotalMilliseconds;
                 if (msToWait > 0)
                     await Task.Delay(msToWait);
             }
