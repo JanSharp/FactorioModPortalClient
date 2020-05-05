@@ -125,7 +125,7 @@ namespace FactorioModPortalClient
             Stream contentStream = await response.Content.ReadAsStreamAsync();
 
             // sha1 validation
-            using SHA1 sha = SHA1.Create("SHA1CryptoServiceProvider"); // TODO: test if this even works (also, i hate it... that string)
+            using SHA1 sha = SHA1.Create(); // considering this uses the default implementation, i'm not sure if it will work in every environment
             byte[] actualSha1Bytes = sha.ComputeHash(contentStream);
             string actualSha1Str = ByteArrayToHex(actualSha1Bytes);
             if (release.Sha1.ToLower() != actualSha1Str.ToLower())
