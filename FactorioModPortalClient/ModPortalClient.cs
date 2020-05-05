@@ -54,15 +54,14 @@ namespace FactorioModPortalClient
 
         async Task ThrottleRequest()
         {
-            DateTime now = DateTime.Now;
             if (lastRequestTime.HasValue)
             {
-                TimeSpan span = now - lastRequestTime.Value;
+                TimeSpan span = DateTime.Now - lastRequestTime.Value;
                 int msToWait = msBetweenRequests - (int)span.TotalMilliseconds;
                 if (msToWait > 0)
                     await Task.Delay(msToWait);
             }
-            lastRequestTime = now;
+            lastRequestTime = DateTime.Now;
         }
 
         async Task<HttpResponseMessage> GetResponseAsync(string url)
