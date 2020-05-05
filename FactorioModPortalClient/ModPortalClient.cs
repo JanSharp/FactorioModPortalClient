@@ -19,7 +19,8 @@ namespace FactorioModPortalClient
         public string userToken;
         public int maxRequestsPerMinute;
         int msBetweenRequests;
-        DateTime? lastRequestTime;
+        DateTime lastRequestTime;
+        int activeThrottleCount;
 
         public int MaxRequestsPerMinute
         {
@@ -39,6 +40,8 @@ namespace FactorioModPortalClient
             this.userName = userName;
             this.userToken = userToken;
             MaxRequestsPerMinute = maxRequestsPerMinute; // note this setting the value to the property not the field
+            lastRequestTime = DateTime.Now.AddMilliseconds(-msBetweenRequests);
+            activeThrottleCount = 0;
         }
 
         string BuildUrl(string main, Dictionary<string, string>? parameters = null)
@@ -54,12 +57,12 @@ namespace FactorioModPortalClient
 
         async Task ThrottleRequest()
         {
-            if (lastRequestTime.HasValue)
+            TimeSpan span = DateTime.Now - lastRequestTime;
+            int msToWait = msBetweenRequests - (int)span.TotalMilliseconds;
+            if (msToWait > 0)
             {
-                TimeSpan span = DateTime.Now - lastRequestTime.Value;
-                int msToWait = msBetweenRequests - (int)span.TotalMilliseconds;
-                if (msToWait > 0)
-                    await Task.Delay(msToWait);
+                await Task.Delay(msToWait + activeThrottleCount++ * msBetweenRequests);
+                --activeThrottleCount;
             }
             lastRequestTime = DateTime.Now;
         }
