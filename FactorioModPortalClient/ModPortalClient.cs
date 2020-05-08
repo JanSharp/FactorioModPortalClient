@@ -110,34 +110,64 @@ namespace FactorioModPortalClient
             return await GetInternalAsync(page?.ToString(), pageSize?.ToString(), namelist);
         }
 
-        /// <summary>
-        /// keep in mind that <see cref="ZipArchive"/> implements <see cref="IDisposable"/>
-        /// </summary>
-        /// <param name="release"></param>
-        /// <returns></returns>
-        public async Task<ZipArchive> DownloadModAsync(Release release)
+        async Task<T> DownloadModInternalAsync<T>(Release release, Func<HttpContent, Task<T>> readContent, Func<SHA1, T, byte[]> computeSha1Hash)
         {
             HttpResponseMessage response = await GetResponseAsync(BuildUrl($"{BaseUrl}/{release.DownloadUrl}", new Dictionary<string, string>()
             {
                 { "username", userName },
                 { "token", userToken },
             }));
-            Stream contentStream = await response.Content.ReadAsStreamAsync();
-
-            // sha1 validation
-            using SHA1 sha = SHA1.Create(); // considering this uses the default implementation, i'm not sure if it will work in every environment
-            byte[] actualSha1Bytes = sha.ComputeHash(contentStream);
-            string actualSha1Str = ByteArrayToHex(actualSha1Bytes);
-            if (release.Sha1.ToLower() != actualSha1Str.ToLower())
-                throw new Exception($"Sha1 validation failed."); // TODO: improve error handling, maybe try downloading again or
+            T content = await readContent(response.Content);
 
             try
             {
-                return new ZipArchive(contentStream, ZipArchiveMode.Read, false, Encoding.UTF8);
+                // sha1 validation
+                using SHA1 sha = SHA1.Create(); // considering this uses the default implementation, i'm not sure if it will work in every environment
+                byte[] actualSha1Bytes = computeSha1Hash(sha, content);
+                string actualSha1Str = ByteArrayToHex(actualSha1Bytes);
+                if (release.Sha1.ToLower() != actualSha1Str.ToLower())
+                    throw new Exception($"Sha1 validation failed."); // TODO: improve error handling, maybe try downloading again or
+            }
+            catch
+            {
+                if (content is IDisposable disposable)
+                    disposable.Dispose();
+                throw;
+            }
+
+            return content;
+        }
+
+        public async Task<byte[]> DownloadModAsByteArrayAsync(Release release)
+        {
+            return await DownloadModInternalAsync(release, async content => await content.ReadAsByteArrayAsync(), (sha, bytes) => sha.ComputeHash(bytes));
+        }
+
+        /// <summary>
+        /// keep in mind that <see cref="Stream"/> implements <see cref="IDisposable"/>
+        /// </summary>
+        /// <param name="release"></param>
+        /// <returns></returns>
+        public async Task<Stream> DownloadModAsStreamAsync(Release release)
+        {
+            return await DownloadModInternalAsync(release, async content => await content.ReadAsStreamAsync(), (sha, stream) => sha.ComputeHash(stream));
+        }
+
+        /// <summary>
+        /// keep in mind that <see cref="ZipArchive"/> implements <see cref="IDisposable"/>
+        /// </summary>
+        /// <param name="release"></param>
+        /// <returns></returns>
+        public async Task<ZipArchive> DownloadModAsZipAsync(Release release)
+        {
+            Stream stream = await DownloadModAsStreamAsync(release);
+            try
+            {
+                return new ZipArchive(stream, ZipArchiveMode.Read, false, Encoding.UTF8);
             }
             catch (Exception e)
             {
-                contentStream.Dispose();
+                stream.Dispose();
                 throw e;
             }
         }
