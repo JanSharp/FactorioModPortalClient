@@ -83,17 +83,17 @@ namespace FactorioModPortalClient
             return JsonSerializer.Deserialize<T>(await response.Content.ReadAsStringAsync());
         }
 
-        public async Task<ResultEntryShort> GetResultEntryShortAsync(string modName)
+        public Task<ResultEntryShort> GetResultEntryShortAsync(string modName)
         {
-            return await GetTInternalAsync<ResultEntryShort>(BuildUrl($"{BaseUrl}/api/mods/{modName}"));
+            return GetTInternalAsync<ResultEntryShort>(BuildUrl($"{BaseUrl}/api/mods/{modName}"));
         }
 
-        public async Task<ResultEntryFull> GetResultEntryFullAsync(string modName)
+        public Task<ResultEntryFull> GetResultEntryFullAsync(string modName)
         {
-            return await GetTInternalAsync<ResultEntryFull>(BuildUrl($"{BaseUrl}/api/mods/{modName}/full"));
+            return GetTInternalAsync<ResultEntryFull>(BuildUrl($"{BaseUrl}/api/mods/{modName}/full"));
         }
 
-        async Task<ModListResponse> GetInternalAsync(string? page = null, string? pageSize = null, IEnumerable<string>? namelist = null)
+        Task<ModListResponse> GetInternalAsync(string? page = null, string? pageSize = null, IEnumerable<string>? namelist = null)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             if (page != null)
@@ -102,12 +102,12 @@ namespace FactorioModPortalClient
                 parameters.Add("page_size", pageSize);
             if (namelist != null)
                 throw new NotImplementedException(); // TODO
-            return await GetTInternalAsync<ModListResponse>(BuildUrl($"{BaseUrl}/api/mods", parameters));
+            return GetTInternalAsync<ModListResponse>(BuildUrl($"{BaseUrl}/api/mods", parameters));
         }
 
-        public async Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string>? namelist = null)
+        public Task<ModListResponse> GetAsync(int? page = null, int? pageSize = null, IEnumerable<string>? namelist = null)
         {
-            return await GetInternalAsync(page?.ToString(), pageSize?.ToString(), namelist);
+            return GetInternalAsync(page?.ToString(), pageSize?.ToString(), namelist);
         }
 
         async Task<T> DownloadModInternalAsync<T>(Release release, Func<HttpContent, Task<T>> readContent, Func<SHA1, T, byte[]> computeSha1Hash)
@@ -138,9 +138,9 @@ namespace FactorioModPortalClient
             return content;
         }
 
-        public async Task<byte[]> DownloadModAsByteArrayAsync(Release release)
+        public Task<byte[]> DownloadModAsByteArrayAsync(Release release)
         {
-            return await DownloadModInternalAsync(release, async content => await content.ReadAsByteArrayAsync(), (sha, bytes) => sha.ComputeHash(bytes));
+            return DownloadModInternalAsync(release, async content => await content.ReadAsByteArrayAsync(), (sha, bytes) => sha.ComputeHash(bytes));
         }
 
         /// <summary>
@@ -148,9 +148,9 @@ namespace FactorioModPortalClient
         /// </summary>
         /// <param name="release"></param>
         /// <returns></returns>
-        public async Task<Stream> DownloadModAsStreamAsync(Release release)
+        public Task<Stream> DownloadModAsStreamAsync(Release release)
         {
-            return await DownloadModInternalAsync(release, async content => await content.ReadAsStreamAsync(), (sha, stream) => sha.ComputeHash(stream));
+            return DownloadModInternalAsync(release, async content => await content.ReadAsStreamAsync(), (sha, stream) => sha.ComputeHash(stream));
         }
 
         /// <summary>
@@ -184,9 +184,9 @@ namespace FactorioModPortalClient
         /// </summary>
         /// <param name="namelist"></param>
         /// <returns></returns>
-        public async Task<ModListResponse> GetMaxAsync(IEnumerable<string>? namelist = null)
+        public Task<ModListResponse> GetMaxAsync(IEnumerable<string>? namelist = null)
         {
-            return await GetInternalAsync(pageSize: "max", namelist: namelist);
+            return GetInternalAsync(pageSize: "max", namelist: namelist);
         }
 
         /// <summary>
