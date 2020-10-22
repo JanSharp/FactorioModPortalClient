@@ -11,7 +11,7 @@ using System.Web;
 
 namespace FactorioModPortalClient
 {
-    public class ModPortalClient
+    public class ModPortalClient : IModPortalClient
     {
         readonly HttpClient httpClient;
         const string BaseUrl = "https://mods.factorio.com";
